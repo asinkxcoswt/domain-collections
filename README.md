@@ -5,7 +5,7 @@ The core module of this library enable you to implement your domain entities beh
 
 For example, you can allow your domain entity class to access database to get setting value just by adding some Mixin to it.
 
-```
+```java
 // declaring Mixin interface
 public interface ApplicationSettingSupport {
 
@@ -16,7 +16,7 @@ public interface ApplicationSettingSupport {
 }
 ```
 
-```
+```java
 // implement the Mixin behavior
 public class ApplicationSettingBehavior implements ApplicationSettingSupport {
 
@@ -33,7 +33,7 @@ public class ApplicationSettingBehavior implements ApplicationSettingSupport {
 }
 ```
 
-```
+```java
 // use the Mixin in domain entity
 
 @Entity
@@ -55,7 +55,7 @@ public class FooEntity implements DomainBehaviorSupport, ApplicationSettingSuppo
 # How to use
 
 Include maven dependency `com.github.asinkxcoswt:domain-collections:V1.0.0-beta` to your project's `pom.xml` along with Spring JPA
-```
+```java
     <repositories>
         <repository>
             <id>jitpack.io</id>
@@ -111,7 +111,7 @@ Include maven dependency `com.github.asinkxcoswt:domain-collections:V1.0.0-beta`
 
 Define `ApplicationSetting` entity and its related repository, no special things here, just a typical Spring JPA and Hibernate application.
 
-```
+```java
 @Entity
 public class ApplicationSetting {
     @Id
@@ -146,13 +146,13 @@ public class ApplicationSetting {
 }
 ```
 
-```
+```java
 public enum ApplicationSettingKeys {
     VAT_RATE
 }
 ```
 
-```
+```java
 @Repository
 public interface ApplicationSettingRepository extends JpaRepository<ApplicationSetting, UUID> {
     ApplicationSetting findByKey(ApplicationSettingKeys key);
@@ -160,7 +160,7 @@ public interface ApplicationSettingRepository extends JpaRepository<ApplicationS
 ```
 
 Here begin the magic, define the mixin interface. The annotation `@DomainBehaviorTarget` tells us which methods you want to use in the Mixin implementation. The method should be declared with `default` keyword so that the target entity (to which the mixin is applied) doesn't have to implement the method. The exception `DomainBehaviorNotImplementedException` is to ensure that the magic works correctly, if anything goes wrong and the mixin behavior doesn't work, this exception will be thrown.
-```
+```java
 public interface ApplicationSettingSupport {
 
     @DomainBehaviorTarget
@@ -171,7 +171,7 @@ public interface ApplicationSettingSupport {
 ```
 
 Next, define the mixin implementation. Note that this class can be a typical Spring bean, you can inject dependency to it as you like. Here we inject the `ApplicationSettingRepository` via the constructor.
-```
+```java
 public class ApplicationSettingBehavior implements ApplicationSettingSupport {
 
     private ApplicationSettingRepository applicationSettingRepository;
@@ -193,7 +193,7 @@ First, the entity have to implement `DomainBehaviorSupport`. It is a marker inte
 
 Next, in the method `getPriceIncludeVat()` we call to `self.getSettingValue()` of the mixin `ApplicationSettingSupport`. The instance field `self` is special, it is annotated with `@DomainBehaviorProxy`. This allow the variable to be injected with the proxy instance of the entity itself. You have to call mixin methods via this proxy, otherwise the `DomainBehaviorNotImplementedException` will be thrown.
 
-```
+```java
 @Entity
 public class FooEntity implements DomainBehaviorSupport, ApplicationSettingSupport {
 
@@ -228,7 +228,7 @@ public class FooEntity implements DomainBehaviorSupport, ApplicationSettingSuppo
 The repository looks normal, but it also has magic. For every method in the repository interface that extends `JpaRepository`, if its return type implements `DomainBehaviorSupport`, the return value will be wrapped with the behavior proxy. This includes all possible generic type supported by `JpaRepository` such as `List<T>`, `Set<T>`, `Optional<T>`, `Page<T>`, `Example<T>`.
 
 In addition, all arguments passed into the method will be ensure to be unwrapped from the behavior proxy. This is an important point to remember. Your ORM engine will not be affected by the behavior proxy.
-```
+```java
 public interface FooRepository extends JpaRepository<FooEntity, UUID> {
     default FooEntity create() {
         return new FooEntity();
@@ -239,7 +239,7 @@ public interface FooRepository extends JpaRepository<FooEntity, UUID> {
 ```
 
 In the main class, add `DomainBehaviorSupportJpaRepositoryFactoryBean.class` to the `@EnableJpaRepositories`. This is to enable to mentioned magic around all repository classes that extend `JpaRepository`.
-```
+```java
 @EnableJpaRepositories(repositoryFactoryBeanClass = DomainBehaviorSupportJpaRepositoryFactoryBean.class)
 @SpringBootApplication
 public class Application {
@@ -250,7 +250,7 @@ public class Application {
 ```
 
 Finally, the configuration bean that is the heart of the magic is `DomainBehaviorManager`. You can register mixins via `domainBehaviorManager.registerBehavior(...)` as much as you like. The `SpringApplicationContextHolder` is used in the `DomainBehaviorManager`, please help declare it as a bean.
-```
+```java
 @Configuration
 public class ApplicationConfiguration {
 
@@ -279,7 +279,7 @@ public class ApplicationConfiguration {
 ```
 
 Time to test our magic!
-```
+```java
 @ExtendWith(SpringExtension.class)
 @SpringBootTest
 public class ApplicationTest {
@@ -307,3 +307,32 @@ public class ApplicationTest {
     }
 }
 ```
+
+# Get the target object reference in a mixin behavior implementation class.
+
+Sometime, you may want to get the reference to the entity in your behavior implementation. Following shows an example of such mixin which enable and entity to detach itself from Hibernate session.
+```java
+public interface EntityManagerSupport {
+    @DomainBehaviorTarget
+    default void detach() { throw new DomainBehaviorNotImplementedException(); }
+}
+```
+
+```java
+public class EntityManagerBehavior implements EntityManagerSupport {
+
+    private EntityManager entityManager;
+
+    public EntityManagerBehavior(EntityManager entityManager) {
+        this.entityManager = entityManager;
+    }
+
+    @Override
+    public void detach() {
+        EntityManagerSupport targetEntity = (EntityManagerSupport) DomainBehaviorManager.getTargetObject();
+        entityManager.detach(targetEntity);
+    }
+}
+```
+
+As you can see from the above example, we use `DomainBehaviorManager.getTargetObject()` to get the target entity that the behavior is being applied.
