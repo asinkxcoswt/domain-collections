@@ -77,6 +77,7 @@ public class DomainBehaviorManager {
     }
 
     private boolean supports(Method method) {
+//        return method.getDeclaredAnnotation(DomainBehaviorTarget.class) != null;
         return this.behaviorMap.containsKey(method.getDeclaringClass()) &&
                 method.isAnnotationPresent(DomainBehaviorTarget.class);
     }

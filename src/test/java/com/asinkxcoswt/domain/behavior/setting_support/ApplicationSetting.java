@@ -45,6 +45,10 @@ public class ApplicationSetting extends BaseEntity implements DomainBehaviorSupp
 
     @Override
     public <T> T getValue(Class<T> targetClass) {
+        if (targetClass.equals(String.class)) {
+            return (T) this.value;
+        }
+
         try {
             return new ObjectMapper().readValue(this.value, targetClass);
         } catch (IOException e) {

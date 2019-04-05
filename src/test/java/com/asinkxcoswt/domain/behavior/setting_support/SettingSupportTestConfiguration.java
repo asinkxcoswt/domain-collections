@@ -11,7 +11,7 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 
 @EnableJpaRepositories(repositoryFactoryBeanClass = DomainBehaviorSupportJpaRepositoryFactoryBean.class)
 @SpringBootApplication
-public class ApplicationSettingTestConfiguration {
+public class SettingSupportTestConfiguration {
 
     @Bean
     public SpringApplicationContextHolder springApplicationContextHolder() {

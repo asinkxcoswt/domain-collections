@@ -10,8 +10,8 @@ import org.springframework.test.context.junit.jupiter.SpringExtension;
 import java.math.BigDecimal;
 
 @ExtendWith(SpringExtension.class)
-@ContextConfiguration(classes = {ApplicationSettingTestConfiguration.class})
-public class ApplicationSettingTest {
+@ContextConfiguration(classes = {SettingSupportTestConfiguration.class})
+public class SettingSupportTest {
     @Autowired
     private FooRepository fooRepository;
 
