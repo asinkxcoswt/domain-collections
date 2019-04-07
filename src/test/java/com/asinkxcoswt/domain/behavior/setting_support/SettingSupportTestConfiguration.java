@@ -6,11 +6,12 @@ import com.asinkxcoswt.domain.behavior.DomainBehaviorManager;
 import com.asinkxcoswt.domain.behavior.jpa.DomainBehaviorSupportJpaRepositoryFactoryBean;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.autoconfigure.jmx.JmxAutoConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 
 @EnableJpaRepositories(repositoryFactoryBeanClass = DomainBehaviorSupportJpaRepositoryFactoryBean.class)
-@SpringBootApplication
+@SpringBootApplication(exclude = {JmxAutoConfiguration.class})
 public class SettingSupportTestConfiguration {
 
     @Bean

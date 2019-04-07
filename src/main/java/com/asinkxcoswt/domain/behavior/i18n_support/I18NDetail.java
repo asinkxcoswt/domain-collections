@@ -4,4 +4,5 @@ import java.util.Locale;
 
 public interface I18NDetail {
     Locale getLocale();
+    void setLocale(Locale locale);
 }

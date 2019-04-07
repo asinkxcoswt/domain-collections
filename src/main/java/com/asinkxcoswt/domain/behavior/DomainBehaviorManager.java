@@ -1,5 +1,6 @@
 package com.asinkxcoswt.domain.behavior;
 
+import org.aopalliance.aop.Advice;
 import org.aopalliance.intercept.MethodInterceptor;
 import org.springframework.aop.framework.ProxyFactory;
 import org.springframework.cglib.proxy.Mixin;
@@ -15,50 +16,42 @@ import java.util.stream.Stream;
 
 public class DomainBehaviorManager {
 
-    private static ThreadLocal<Object> targetObjectHolder = new ThreadLocal<>();
-    private Map<Class<?>, Object> behaviorMap = new HashMap<>();
-    private Mixin mixin;
-
-    public static Object getTargetObject() {
-        return targetObjectHolder.get();
-    }
+    private Map<Class<?>, Advice> adviceMap = new HashMap<>();
+    private DomainBehaviorMixinAdvice defaultAdvice = new DomainBehaviorMixinAdvice();
 
     public <INTERFACE, IMPL extends INTERFACE> void registerBehavior(Class<INTERFACE> interfaceClass, IMPL impl) {
-        this.behaviorMap.put(interfaceClass, impl);
+        this.defaultAdvice.registerBehavior(interfaceClass, impl);
+    }
+
+    public void registerBehavior(Class interfaceClass, Advice advice) {
+        this.adviceMap.put(interfaceClass, advice);
     }
 
     public void afterPropertiesSet() {
-        List<Class<?>> interfaceClassList = new ArrayList<>();
-        List<Object> implList = new ArrayList<>();
-        for (Map.Entry<Class<?>, Object> entry : this.behaviorMap.entrySet()) {
-            interfaceClassList.add(entry.getKey());
-            implList.add(entry.getValue());
-        }
-        this.mixin = Mixin.create(interfaceClassList.toArray(new Class[0]), implList.toArray());
+        this.defaultAdvice.afterPropertiesSet();
+    }
+
+    public static Object getTargetObject() {
+        return DomainBehaviorMixinAdvice.getTargetObject();
     }
 
     public <T extends DomainBehaviorSupport> T wrapBehaviors(T domainObject) {
-        if (this.mixin == null) {
-            throw new IllegalStateException("Mixins are not finalized, forgot to call DomainBehaviorManager::afterPropertiesSet ?");
-        }
-
         ProxyFactory proxyFactory = new ProxyFactory();
         proxyFactory.setTarget(domainObject);
-        proxyFactory.addAdvice((MethodInterceptor) methodInvocation -> {
-            Method method = methodInvocation.getMethod();
-            Object target = methodInvocation.getThis();
-            if (supports(method)) {
-                targetObjectHolder.set(target);
-                Object result = method.invoke(mixin, methodInvocation.getArguments());
-                targetObjectHolder.remove();
-                return result;
-            } else {
-                return methodInvocation.proceed();
+        proxyFactory.addAdvice(this.defaultAdvice);
+        adviceMap.forEach((interfaceClass, advice) -> {
+            if (interfaceClass.isAssignableFrom(domainObject.getClass())) {
+                proxyFactory.addAdvice(advice);
             }
         });
 
-
         T wrappedObject = (T) proxyFactory.getProxy();
+        injectSelfProxy(domainObject, wrappedObject);
+
+        return wrappedObject;
+    }
+
+    private <T extends DomainBehaviorSupport> void injectSelfProxy(T domainObject, T proxyObject) {
         Optional<Field> proxyFieldOptional = Stream.of(domainObject.getClass().getDeclaredFields())
                 .filter(field -> field.isAnnotationPresent(DomainBehaviorProxy.class))
                 .findFirst();
@@ -67,18 +60,10 @@ public class DomainBehaviorManager {
             Field proxyField = proxyFieldOptional.get();
             try {
                 proxyField.setAccessible(true);
-                proxyField.set(domainObject, wrappedObject);
+                proxyField.set(domainObject, proxyObject);
             } catch (IllegalAccessException e) {
                 throw new IllegalArgumentException("Cannot bind domain behavior proxy to the field '" + proxyField.getName() + "'", e);
             }
         }
-
-        return wrappedObject;
-    }
-
-    private boolean supports(Method method) {
-//        return method.getDeclaredAnnotation(DomainBehaviorTarget.class) != null;
-        return this.behaviorMap.containsKey(method.getDeclaringClass()) &&
-                method.isAnnotationPresent(DomainBehaviorTarget.class);
     }
 }
